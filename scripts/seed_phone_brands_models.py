@@ -1,3 +1,4 @@
+import sys
 import asyncio
 import csv
 from collections import defaultdict
@@ -7,14 +8,11 @@ from app.db import SessionLocal
 from app.models import PhoneBrand, PhoneModel
 
 
-CSV_FILE = Path("C:\\Users\\Rakshat Shetty\\Downloads\\phone_models.csv")
-
-
-async def seed_from_csv():
+async def seed_from_csv(csv_path):
     async with SessionLocal() as session:
         brand_map = {}  # Map brand name to brand_id
 
-        with open(CSV_FILE, newline='') as csvfile:
+        with open(csv_path, newline='') as csvfile:
             reader = csv.DictReader(csvfile)
             rows_by_brand = defaultdict(list)
 
@@ -46,4 +44,7 @@ async def seed_from_csv():
 
 
 if __name__ == "__main__":
-    asyncio.run(seed_from_csv())
+    if len(sys.argv) < 2:
+        print("Kindly pass csv file path as an arg")
+        sys.exit(1)
+    asyncio.run(seed_from_csv(sys.argv[1]))
