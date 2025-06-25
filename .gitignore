@@ -169,3 +169,8 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+
+# ignbore hidden files and directories
+.*/
+!.git
+!.github
