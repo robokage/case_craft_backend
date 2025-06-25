@@ -1,10 +1,18 @@
 from dotenv import load_dotenv
-import os
-
-load_dotenv()  # Loads from .env into environment variables
-
-# Now you can access them
-DATABASE_URL = os.getenv("DATABASE_URL")
+load_dotenv() 
 
 
-print(DATABASE_URL)
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+from app.routers.phones import router as phone_router
+
+app = FastAPI()
+app.include_router(phone_router, prefix="/phones")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Or ["http://localhost:3000"] if using specific frontend
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
