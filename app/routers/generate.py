@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db import SessionLocal
 from app.models import PhoneModel
 from huggingface_hub import InferenceClient
+from uuid import uuid4
 
 from scripts.utils import Utils
 
@@ -49,13 +50,13 @@ async def generate_with_just_prompt(prompt: str, phone_model_id:int , bg_tasks: 
             headers={"Content-Disposition": "attachment; filename=generated_images.zip"}
         )
     else:
-        img_data = await utils.generate_with_replicate(prompt, 
+        outputs = await utils.generate_with_replicate(prompt, 
                                                      phone_mdl_parm.phone_height,  # type: ignore
                                                      phone_mdl_parm.phone_width,  # type: ignore
                                                      num_outputs)
         return_data = {}
-        for img_uuid, img_data in img_data.items():
-            bg_tasks.add_task(utils.upload_to_s3, img_data.get("bytes"), img_uuid)
-            return_data[img_uuid] = img_data.get('base64')
-        
+        for img_file in outputs: #type: ignore
+            img_uuid = uuid4()
+            return_data[img_uuid] = img_file.url
+            bg_tasks.add_task(utils.upload_to_s3, img_file.read(), img_uuid)
         return return_data

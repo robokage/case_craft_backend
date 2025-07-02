@@ -90,6 +90,7 @@ class Utils:
         Returns:
             _type_: _description_
         """
+        outputs = []
         img_height = self.mm_to_pixels(float(phone_height))
         img_width = self.mm_to_pixels(float(phone_width))
         input = {
@@ -98,18 +99,12 @@ class Utils:
             "output_format": "png",
             "num_outputs":num_outputs
         }
-        outputs =  await replicate.async_run("black-forest-labs/flux-schnell", 
-                                           input=input)
-        
-        img_data = {}
-        if not isinstance(outputs, list):
-            print("Generated Output is not a List.")
-            return img_data
-        for img_bytes in outputs:
-            img_base64 = self.convert_img_to_data_uri(img_bytes)
-            img_data[uuid4] = {"base64": img_base64,
-                                      "bytes": img_bytes}
-        return img_data
+        try:
+            outputs =  await replicate.async_run("black-forest-labs/flux-schnell", 
+                                            input=input)
+        except Exception as err:
+            print("Following error occurred while generating image: {err} \n input params: {input}")
+        return outputs
     
 
     @staticmethod
@@ -154,8 +149,9 @@ class Utils:
         Returns:
             _type_: _description_
         """
+        file_uuid = str(file_uuid)
         self.s3.upload_fileobj(
-            Fileobj=img_bytes,
+            Fileobj=io.BytesIO(img_bytes),
             Bucket=os.getenv("AWS_S3_BUCKET"),
             Key=file_uuid,
             ExtraArgs={'ContentType': 'image/png'}
