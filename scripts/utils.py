@@ -98,7 +98,7 @@ class Utils:
             "output_format": "png",
             "num_outputs":num_outputs
         }
-        outputs =  await replicate.async_run("black-forest-labs/flux-dev", 
+        outputs =  await replicate.async_run("black-forest-labs/flux-schnell", 
                                            input=input)
         
         img_data = {}
