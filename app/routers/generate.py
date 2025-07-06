@@ -5,7 +5,7 @@ import io
 
 from fastapi import APIRouter, Depends, BackgroundTasks
 from fastapi.responses import StreamingResponse
-from sqlalchemy.future import select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.db import SessionLocal
 from app.models import PhoneModel

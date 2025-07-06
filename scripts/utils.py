@@ -7,6 +7,7 @@ import redis.exceptions
 import boto3
 from botocore.client import Config
 import io
+from passlib.context import CryptContext
 import cloudinary
 import cloudinary.uploader as cd_uploader
 from huggingface_hub import InferenceClient, upload_file
@@ -17,6 +18,7 @@ from uuid import uuid4
 class Utils:
 
     def __init__(self) -> None:
+        self.pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
         self.client = InferenceClient(
             provider="together",
             api_key=os.environ["HF_TOKEN"],
@@ -103,7 +105,8 @@ class Utils:
             outputs =  await replicate.async_run("black-forest-labs/flux-schnell", 
                                             input=input)
         except Exception as err:
-            print("Following error occurred while generating image: {err} \n input params: {input}")
+            print("Following error occurred while generating image: {err} \n" \
+                  "input params: {input}")
         return outputs
     
 
@@ -161,3 +164,11 @@ class Utils:
             Params={"Bucket": os.getenv("AWS_S3_BUCKET"), "Key": file_uuid},
         )
         self.r.set(file_uuid, signed_url)
+
+    def hash_password(self, password: str):
+        return self.pwd_context.hash(password)
+    
+    def verify_pass_word(self, plain_pass: str, hashed_pass: str):
+        return self.pwd_context.verify(plain_pass, hashed_pass)
+    
+
