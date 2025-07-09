@@ -11,7 +11,7 @@ from passlib.context import CryptContext
 import cloudinary
 import cloudinary.uploader as cd_uploader
 from huggingface_hub import InferenceClient, upload_file
-from uuid import uuid4
+from fastapi import HTTPException
 
 
 
@@ -34,6 +34,7 @@ class Utils:
             region_name=os.getenv("AWS_REGION"),  
             config=Config(signature_version="s3v4")
         )
+        self.max_gen_for_anon = 1
         try:
             self.r = redis.Redis(host='localhost', port=6379)
             self.r.ping()
@@ -171,4 +172,8 @@ class Utils:
     def verify_pass_word(self, plain_pass: str, hashed_pass: str):
         return self.pwd_context.verify(plain_pass, hashed_pass)
     
-
+    def validate_max_gen_anon(self, anon_id):
+        count = self.r.get(anon_id)
+        if count and int(count) >= self.max_gen_for_anon: # type: ignore
+            raise  HTTPException(status_code=403, detail="Login required after 2 generations")
+        self.r.set(anon_id, (count + 1)) # type: ignore
