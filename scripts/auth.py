@@ -1,8 +1,7 @@
 import os
-from jose import jwt
 from datetime import datetime, timedelta
 from jose import JWTError, jwt
-from fastapi import Depends
+from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 
 
@@ -48,7 +47,8 @@ class AuthUtils:
         try:
             payload = jwt.decode(token, self.secret_key, algorithms=[self.jwt_algo])
             if payload:
-                user_id = payload.get('id')
+                user_id = payload.get('public_id')
         except JWTError:
-            print("Invalid Token")
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, 
+                                detail="Invalid token")
         return user_id

@@ -29,3 +29,8 @@ class UserCreate(BaseModel):
         if errors:
             raise ValueError("Password must contain at least: " + ", ".join(errors))
         return v
+
+
+class PromptInput(BaseModel):
+    prompt: str
+    phone_model_id: str
