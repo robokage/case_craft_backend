@@ -2,7 +2,7 @@ import os
 from jose import jwt
 from datetime import datetime, timedelta
 from jose import JWTError, jwt
-from fastapi import Depends, HTTPException
+from fastapi import Depends
 from fastapi.security import OAuth2PasswordBearer
 
 
@@ -31,7 +31,7 @@ class AuthUtils:
         to_encode.update({"exp": expire})
         return jwt.encode(to_encode, self.secret_key, algorithm=self.jwt_algo)
     
-    def get_current_user(self, token: str = Depends(oauth2_scheme)):
+    def get_current_user_id(self, token: str = Depends(oauth2_scheme)):
         """_summary_
 
         Args:
@@ -44,11 +44,11 @@ class AuthUtils:
         Returns:
             _type_: _description_
         """
+        user_id = None
         try:
             payload = jwt.decode(token, self.secret_key, algorithms=[self.jwt_algo])
-            if not payload:
-                raise HTTPException(status_code=401, detail="Invalid token")
-            return payload
+            if payload:
+                user_id = payload.get('id')
         except JWTError:
-            raise HTTPException(status_code=401, detail="Invalid token")
-        
+            print("Invalid Token")
+        return user_id

@@ -1,17 +1,21 @@
 import asyncio
 import os
+import io
 import replicate
 import base64
 import redis
 import redis.exceptions
 import boto3
 from botocore.client import Config
-import io
+from uuid import uuid4
 from passlib.context import CryptContext
 import cloudinary
 import cloudinary.uploader as cd_uploader
-from huggingface_hub import InferenceClient, upload_file
-from fastapi import HTTPException
+from huggingface_hub import InferenceClient
+from fastapi import HTTPException, BackgroundTasks
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+from app.models import PhoneModel
 
 
 
@@ -173,7 +177,46 @@ class Utils:
         return self.pwd_context.verify(plain_pass, hashed_pass)
     
     def validate_max_gen_anon(self, anon_id):
-        count = self.r.get(anon_id)
-        if count and int(count) >= self.max_gen_for_anon: # type: ignore
+        """_summary_
+
+        Args:
+            anon_id (_type_): _description_
+
+        Raises:
+            HTTPException: _description_
+        """
+        count = int(self.r.get(anon_id)) if self.r.get(anon_id) else 0 # type: ignore
+        if count and count >= self.max_gen_for_anon: # type: ignore
             raise  HTTPException(status_code=403, detail="Login required after 2 generations")
         self.r.set(anon_id, (count + 1)) # type: ignore
+    
+    async def handle_generation(
+            self, prompt: str, phone_model_id:str, db: AsyncSession, bg_tasks: BackgroundTasks
+            ) -> dict:
+        """_summary_
+
+        Args:
+            prompt (str): _description_
+            phone_model_id (str): _description_
+            db (AsyncSession): _description_
+            bg_tasks (BackgroundTasks): _description_
+
+        Returns:
+            dict: _description_
+        """
+        result = await db.execute(select(PhoneModel).where(PhoneModel.id == phone_model_id))
+        phone_mdl_parm = result.scalar_one()
+        
+        outputs = await self.generate_with_replicate(
+            prompt,
+            phone_mdl_parm.phone_height,  # type: ignore
+            phone_mdl_parm.phone_width,   # type: ignore
+            1
+        )
+
+        return_data = {}
+        for img_file in outputs:  # type: ignore
+            img_uuid = uuid4()
+            return_data[str(img_uuid)] = img_file.url
+            bg_tasks.add_task(self.upload_to_s3, img_file.read(), str(img_uuid))
+        return return_data

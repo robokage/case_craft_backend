@@ -1,23 +1,19 @@
-import asyncio
-import os
-import zipfile
-import io
-
-from fastapi import APIRouter, Depends, BackgroundTasks
-from fastapi.responses import StreamingResponse
-from sqlalchemy import select
+from typing import Annotated
+from fastapi import APIRouter, Depends, BackgroundTasks, Request
+from fastapi.responses import JSONResponse
+from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.db import SessionLocal
-from app.models import PhoneModel
-from huggingface_hub import InferenceClient
 from uuid import uuid4
 
 from scripts.utils import Utils
+from scripts.auth import AuthUtils
 
 
 router = APIRouter()
 utils = Utils()
-num_outputs = 1
+auth_utils = AuthUtils()
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 
 async def get_db():
@@ -25,38 +21,35 @@ async def get_db():
         yield sl
 
 
-@router.post("/prompt-only")
-async def generate_with_just_prompt(prompt: str, phone_model_id:int , bg_tasks: BackgroundTasks, db:AsyncSession = Depends(get_db), inference_provider="replicate"):
-    result = await db.execute(select(PhoneModel).where(PhoneModel.id == phone_model_id))
-    phone_mdl_parm = result.scalar_one()
-    if inference_provider=="hf":
-        image_tasks = [utils.generate_with_hf(prompt, phone_mdl_parm.phone_height, phone_mdl_parm.phone_width) # type: ignore
-                    for _ in range(num_outputs)] 
-        images = await asyncio.gather(*image_tasks)
-        
-        # Create an in-memory ZIP file
-        zip_buffer = io.BytesIO()
-        with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
-            for idx, img in enumerate(images):
-                img_bytes = io.BytesIO()
-                img.save(img_bytes, format="PNG")
-                img_bytes.seek(0)
-                zip_file.writestr(f"image_{idx+1}.png", img_bytes.read())
-                
-        zip_buffer.seek(0)
-        return StreamingResponse(
-            zip_buffer,
-            media_type="application/x-zip-compressed",
-            headers={"Content-Disposition": "attachment; filename=generated_images.zip"}
-        )
-    else:
-        outputs = await utils.generate_with_replicate(prompt, 
-                                                     phone_mdl_parm.phone_height,  # type: ignore
-                                                     phone_mdl_parm.phone_width,  # type: ignore
-                                                     num_outputs)
-        return_data = {}
-        for img_file in outputs: #type: ignore
-            img_uuid = uuid4()
-            return_data[img_uuid] = img_file.url
-            bg_tasks.add_task(utils.upload_to_s3, img_file.read(), img_uuid)
-        return return_data
+db_dependency = Annotated[AsyncSession, Depends(get_db)]
+
+
+@router.post("/anon/prompt-only")
+async def generate_with_just_prompt_anon(
+    prompt: str, 
+    phone_model_id:str , 
+    request: Request,
+    bg_tasks: BackgroundTasks, 
+    db: db_dependency
+):
+    anon_id = request.cookies.get("anon_id")
+    if not anon_id:
+            anon_id = str(uuid4())
+    utils.validate_max_gen_anon(anon_id)
+    return_data = await utils.handle_generation(prompt, phone_model_id, db, bg_tasks)
+    response = JSONResponse(content=return_data)
+    response.set_cookie(key="anon_id", value=anon_id, max_age=60*60*24*30)
+    return response
+
+
+@router.post("/user/prompt-only")
+async def generate_with_just_prompt(
+    prompt: str, 
+    phone_model_id:str , 
+    bg_tasks: BackgroundTasks, 
+    db: db_dependency, 
+    token: str = Depends(oauth2_scheme)
+    ):
+    auth_utils.get_current_user_id(token)
+    return_data = await utils.handle_generation(prompt, phone_model_id, db, bg_tasks)
+    return return_data

@@ -1,7 +1,5 @@
 from typing import Annotated
-from unittest import result
 from fastapi import APIRouter, Depends, HTTPException
-from app import db
 from app.models import UserModel
 from app.schemas import UserCreate, UserLogin
 from app.db import SessionLocal
@@ -22,7 +20,7 @@ async def get_db():
 
 db_dependency = Annotated[AsyncSession, Depends(get_db)]
 
-@user_router.post("/user_sign_up")
+@user_router.post("/user-signup")
 async def user_sign_up(user_data: UserCreate, db: db_dependency):
     result = await db.execute(select(UserModel).where(UserModel.email == user_data.email))
     if result.scalar_one_or_none():
@@ -38,7 +36,7 @@ async def user_sign_up(user_data: UserCreate, db: db_dependency):
     await db.close()
     return {"message": "User created", "user_id": user_id}
 
-@user_router.post("/user_login")
+@user_router.post("/user-login")
 async def user_log_in(user_data: UserLogin, db: db_dependency):
     result = await db.execute(select(UserModel).where(UserModel.email == user_data.email))
     user = result.scalar_one_or_none()
