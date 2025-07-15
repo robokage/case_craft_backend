@@ -38,7 +38,7 @@ class Utils:
             region_name=os.getenv("AWS_REGION"),  
             config=Config(signature_version="s3v4")
         )
-        self.max_gen_for_anon = 100
+        self.max_gen_for_anon = 1
         try:
             self.r = redis.Redis(host='localhost', port=6379)
             self.r.ping()
