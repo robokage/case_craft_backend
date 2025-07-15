@@ -38,7 +38,7 @@ class Utils:
             region_name=os.getenv("AWS_REGION"),  
             config=Config(signature_version="s3v4")
         )
-        self.max_gen_for_anon = 1
+        self.max_gen_for_anon = 100
         try:
             self.r = redis.Redis(host='localhost', port=6379)
             self.r.ping()
@@ -187,7 +187,8 @@ class Utils:
         """
         count = int(self.r.get(anon_id)) if self.r.get(anon_id) else 0 # type: ignore
         if count and count >= self.max_gen_for_anon: # type: ignore
-            raise  HTTPException(status_code=403, detail="Login required after 2 generations")
+            raise  HTTPException(status_code=403, 
+                                 detail="Kindly login to generate further exiting designs!!!")
         self.r.set(anon_id, (count + 1)) # type: ignore
     
     async def handle_generation(

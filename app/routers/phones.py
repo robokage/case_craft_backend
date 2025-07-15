@@ -21,7 +21,7 @@ async def get_phone_brands(db: AsyncSession = Depends(get_db)):
     return [{"id": brand.id, "name": brand.name} for brand in brands]
 
 @router.get("/brands/{brand_id}/models")
-async def get_phone_models(brand_id: int, db: AsyncSession = Depends(get_db)):
+async def get_phone_models(brand_id: str, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(PhoneModel).where(PhoneModel.brand_id == brand_id))
     models = result.scalars().all()
     return [{"id": model.id, "name": model.name} for model in models]
