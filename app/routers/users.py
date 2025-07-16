@@ -44,7 +44,7 @@ async def user_log_in(db: db_dependency, form_data: OAuth2PasswordRequestForm = 
     result = await db.execute(select(UserModel).where(UserModel.email == user_data.email))
     user = result.scalar_one_or_none()
     if not user or not  utils.verify_pass_word(user_data.password, user.password): #type: ignore
-        raise HTTPException(status_code=401, detail="User Credentials Invalid")
+        raise HTTPException(status_code=401, detail="Invalid Credentials")
     token_data = {"public_id": str(user.public_id), "name": user.name, "email": user.email}
     jwt_token = auth_utils.create_access_token(data=token_data)
     return {"access_token": jwt_token, "token_type": "bearer"}

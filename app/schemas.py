@@ -1,5 +1,6 @@
 import re
 from pydantic import BaseModel, EmailStr, Field, field_validator
+from fastapi import HTTPException
 
 
 class UserLogin(BaseModel):
@@ -27,7 +28,8 @@ class UserCreate(BaseModel):
             errors.append("one special character")
 
         if errors:
-            raise ValueError("Password must contain at least: " + ", ".join(errors))
+            raise HTTPException(status_code=400, 
+                                detail="Password must contain at least: " + ",".join(errors))
         return v
 
 
