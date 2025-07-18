@@ -9,6 +9,7 @@ from scripts.utils import Utils
 from scripts.auth import AuthUtils
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from pydantic import ValidationError
 
 
 
@@ -40,7 +41,11 @@ async def user_sign_up(user_data: UserCreate, db: db_dependency):
 
 @user_router.post("/user-login")
 async def user_log_in(db: db_dependency, form_data: OAuth2PasswordRequestForm = Depends()):
-    user_data = UserLogin(email=form_data.username, password=form_data.password)
+    try:
+        user_data = UserLogin(email=form_data.username, password=form_data.password)
+    except ValidationError as ve:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, 
+                            detail=ve.errors()[0].get('ctx').get('reason')) #type: ignore
     result = await db.execute(select(UserModel).where(UserModel.email == user_data.email))
     user = result.scalar_one_or_none()
     if not user or not  utils.verify_pass_word(user_data.password, user.password): #type: ignore
