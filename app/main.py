@@ -1,9 +1,10 @@
+import os
+from starlette.middleware.sessions import SessionMiddleware
 from dotenv import load_dotenv
-load_dotenv() 
-
-
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+
+load_dotenv() 
 
 from app.routers.phones import router as phone_router
 from app.routers.generate import router as gen_router
@@ -20,3 +21,4 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(SessionMiddleware, secret_key=os.getenv("SECRET_KEY")) #type: ignore
