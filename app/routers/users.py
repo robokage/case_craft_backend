@@ -11,6 +11,8 @@ from scripts.auth import AuthUtils
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import ValidationError
+from fastapi.responses import RedirectResponse
+from urllib.parse import urlencode
 
 
 
@@ -77,7 +79,8 @@ async def google_callback(request: Request, db: db_dependency):
         db.add(new_user)
         await db.commit()
         await db.close()
-    user_data = {"public_id": str(new_user.public_id), 
-                 "name": new_user.name, 
-                 "email": new_user.email}
-    return user_data
+    token_data = {"public_id": str(new_user.public_id), 
+                  "name": new_user.name}
+    jwt_token = auth_utils.create_access_token(data=token_data)
+    params = urlencode({"access_token": jwt_token, "token_type": "bearer"})
+    return RedirectResponse(url=f"{os.getenv('FRONTEND_URL')}/google/callback?{params}")
