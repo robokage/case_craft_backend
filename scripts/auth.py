@@ -106,7 +106,6 @@ class AuthUtils:
             _type_: _description_
         """
         is_valid = self.r.get(f"reset_token:{token}")
-        print("???", type(is_valid))
         if not is_valid:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, 
                                 detail="Reset link has expired. Kindly try")

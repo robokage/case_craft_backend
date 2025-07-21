@@ -97,9 +97,7 @@ async def send_password_reset_mail(req_data: PasswordResetRequest, db:db_depende
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, 
                             detail=f"This account is connected via {str(user_data.auth_provider).capitalize()}. Use that to sign in or reset password")
     reset_link = auth_utils.get_reset_link(user_data.email)  #type: ignore
-    print(">>>>>", reset_link)
     utils.send_reset_mail(to_email=user_data.email, reset_link=reset_link) #type: ignore
-    print(">>>>>", "email sent")
     return {"message": "Password reset link sent"}
 
 
