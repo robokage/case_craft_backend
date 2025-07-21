@@ -6,17 +6,20 @@ import base64
 import redis
 import redis.exceptions
 import boto3
+from datetime import datetime
 from botocore.client import Config
 from uuid import uuid4
 from passlib.context import CryptContext
 import cloudinary
 import cloudinary.uploader as cd_uploader
 from huggingface_hub import InferenceClient
-from fastapi import HTTPException, BackgroundTasks
+from fastapi import HTTPException, BackgroundTasks, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.models import PhoneModel
-
+import smtplib
+from email.message import EmailMessage
+from scripts.auth import AuthUtils
 
 
 class Utils:
@@ -38,9 +41,11 @@ class Utils:
             region_name=os.getenv("AWS_REGION"),  
             config=Config(signature_version="s3v4")
         )
+        current_file = os.path.abspath(__file__)
+        self.project_dir = os.path.dirname(os.path.dirname(current_file))
         self.max_gen_for_anon = 1
         try:
-            self.r = redis.Redis(host='localhost', port=6379)
+            self.r = redis.Redis(host='localhost', port=6379, decode_responses=True)
             self.r.ping()
             print("✅ Redis server is running.")
         except redis.exceptions.ConnectionError:
@@ -221,3 +226,49 @@ class Utils:
             return_data[str(img_uuid)] = img_file.url
             bg_tasks.add_task(self.upload_to_s3, img_file.read(), str(img_uuid))
         return return_data
+    
+    @staticmethod
+    def send_email(to_email: str, subject: str, body=None, html_content=None):
+        """_summary_
+
+        Args:
+            to_email (str): _description_
+            subject (str): _description_
+            body (_type_, optional): _description_. Defaults to None.
+            html_content (_type_, optional): _description_. Defaults to None.
+
+        Raises:
+            HTTPException: _description_
+        """
+        msg = EmailMessage()
+        msg['Subject'] = subject
+        msg['From'] = os.getenv("GMAIL_ID", "")
+        msg['To'] = to_email
+        if body:
+            msg.set_content(body)
+        elif html_content:
+            msg.set_content("Please use an email client that supports HTML to view this message.")
+            msg.add_alternative(html_content, subtype='html')
+        else:
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, 
+                                detail="Could not send mail. Body missing")
+
+        with smtplib.SMTP("smtp.gmail.com", 587) as smtp:
+            smtp.starttls()
+            smtp.login(os.getenv("GMAIL_ID", ""), os.getenv('GMAIL_APP_PASS', ""))
+            smtp.send_message(msg)
+
+    def send_reset_mail(self, to_email: str, reset_link: str):
+        """_summary_
+
+        Args:
+            to_email (str): _description_
+            reset_link (str): _description_
+        """
+        subject = "Password Recovery Mail"
+        template_path = os.path.join(self.project_dir, "templates", "reset_password_mail.html")
+        with open(template_path, 'r', encoding='utf-8') as file:
+            html = file.read()
+        html_content = html.replace("{reset_link}", reset_link).replace("{year}", str(datetime.now().year))
+        self.send_email(to_email=to_email, subject=subject, html_content=html_content)
+   

@@ -1,10 +1,12 @@
 import os
+import redis
 from datetime import datetime, timedelta
 from jose import JWTError, jwt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from authlib.integrations.starlette_client import OAuth
 from starlette.config import Config
+from sympy import N
 
 
 class AuthUtils:
@@ -35,6 +37,7 @@ class AuthUtils:
             client_kwargs={"scope": os.getenv("GOOGLE_API_SCOPE")},
             server_metadata_url=os.getenv("GOOGLE_SERVER_METADATA_URL")
         )
+        self.r = redis.Redis(host='localhost', port=6379, decode_responses=True)
 
     def create_access_token(self, data: dict, exp_min: int = 0):
         """_summary_
@@ -74,3 +77,48 @@ class AuthUtils:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, 
                                 detail="Invalid token")
         return user_id
+    
+    def get_reset_link(self, user_email: str):
+        """_summary_
+
+        Args:
+            user_email (str): _description_
+
+        Returns:
+            _type_: _description_
+        """
+        token = self.create_access_token(data={"email": user_email})
+        reset_link = f"{os.getenv('FRONTEND_URL')}/reset-password?token={token}"
+        self.r.setex(f"reset_token:{token}", 930, user_email) 
+        return reset_link
+
+    def validate_reset_token(self, token: str):
+        """_summary_
+
+        Args:
+            token (str): _description_
+
+        Raises:
+            HTTPException: _description_
+            HTTPException: _description_
+
+        Returns:
+            _type_: _description_
+        """
+        is_valid = self.r.get(f"reset_token:{token}")
+        print("???", type(is_valid))
+        if not is_valid:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, 
+                                detail="Reset link has expired. Kindly try")
+        user_email = None 
+        try:
+            payload = jwt.decode(token, self.secret_key, algorithms=[self.jwt_algo])
+            if payload:
+                user_email = payload.get('email')
+        except JWTError:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, 
+                                detail="Invalid token")
+        return user_email
+    
+    def delete_reset_token(self, token):
+        self.r.delete(f"reset_token:{token}")

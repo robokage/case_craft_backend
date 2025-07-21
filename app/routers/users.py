@@ -3,8 +3,8 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.security import OAuth2PasswordRequestForm
 from fastapi import status
-from app.models import UserModel
-from app.schemas import UserCreate, UserLogin
+from app.models import UserModel, AuthProvider
+from app.schemas import UserCreate, UserLogin, PasswordResetRequest, ResetPassword
 from app.db import SessionLocal
 from scripts.utils import Utils
 from scripts.auth import AuthUtils
@@ -84,3 +84,35 @@ async def google_callback(request: Request, db: db_dependency):
     jwt_token = auth_utils.create_access_token(data=token_data)
     params = urlencode({"access_token": jwt_token, "token_type": "bearer"})
     return RedirectResponse(url=f"{os.getenv('FRONTEND_URL')}/google/callback?{params}")
+
+
+@user_router.post("/send-password-reset-mail")
+async def send_password_reset_mail(req_data: PasswordResetRequest, db:db_dependency):
+    result = await db.execute(select(UserModel).where(UserModel.email == req_data.email))
+    user_data = result.scalar_one_or_none()
+    if not user_data:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, 
+                            detail="Could not find User. Kindly create a new account")
+    if user_data.auth_provider != AuthProvider.local: #type: ignore
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, 
+                            detail=f"This account is connected via {str(user_data.auth_provider).capitalize()}. Use that to sign in or reset password")
+    reset_link = auth_utils.get_reset_link(user_data.email)  #type: ignore
+    print(">>>>>", reset_link)
+    utils.send_reset_mail(to_email=user_data.email, reset_link=reset_link) #type: ignore
+    print(">>>>>", "email sent")
+    return {"message": "Password reset link sent"}
+
+
+@user_router.post("/reset-password")
+async def reset_password(data: ResetPassword, db: db_dependency):
+    user_email = auth_utils.validate_reset_token(token=data.token)
+    result = await db.execute(select(UserModel).where(UserModel.email == user_email))
+    user_data = result.scalar_one_or_none()
+    if not user_data:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, 
+                            detail="Could not find User")
+    user_data.password = utils.hash_password(data.new_password) #type: ignore
+    await db.commit()
+    auth_utils.delete_reset_token(data.token)
+    return {"message": "Your password has been successfully reset"}
+    
