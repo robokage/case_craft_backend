@@ -11,7 +11,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from urllib.parse import urljoin
 from requests.adapters import HTTPAdapter
-from requests.packages.urllib3.util.retry import Retry
+from requests.packages.urllib3.util.retry import Retry # type: ignore
 
 
 
@@ -53,11 +53,11 @@ class Scrapper:
         container = soup.find('div', class_='combo-grid-list-filter w-dyn-items')
     
         links = {}
-        for item in container.find_all('div', attrs={"data-item": "true", "role": "listitem"}):
-            a_tag = item.find('a', class_='text-element-title-grid')
-            name = a_tag.text.strip()
-            if a_tag and a_tag.get('href'):
-                links[name] = urljoin(self.base_url, a_tag['href'])
+        for item in container.find_all('div', attrs={"data-item": "true", "role": "listitem"}): # type: ignore
+            a_tag = item.find('a', class_='text-element-title-grid') # type: ignore
+            name = a_tag.text.strip() # type: ignore
+            if a_tag and a_tag.get('href'): # type: ignore
+                links[name] = urljoin(self.base_url, a_tag['href']) # type: ignore
         return links
     
     @staticmethod
@@ -102,15 +102,15 @@ class Scrapper:
             return
 
         # 1. Extract dimensions & designer
-        for wrapper in detail_wrapper.find_all("div", class_="detail-text-item-wrapper"):
-            key_div = wrapper.find("div", class_="detail-subtitle")
-            val_div = wrapper.find("div", class_="detail-text")
+        for wrapper in detail_wrapper.find_all("div", class_="detail-text-item-wrapper"): # type: ignore
+            key_div = wrapper.find("div", class_="detail-subtitle") # type: ignore
+            val_div = wrapper.find("div", class_="detail-text") # type: ignore
             if key_div and val_div:
                 key = key_div.get_text(strip=True).replace(":", "")
                 val = val_div.get_text(strip=True)
                 result[key] = val
 
-        designer_div = detail_wrapper.find("div", class_="detail-subtitle w-embed", string="Designer:")
+        designer_div = detail_wrapper.find("div", class_="detail-subtitle w-embed", string="Designer:") # type: ignore
         if designer_div:
             designer_text = designer_div.find_next_sibling("div", class_="detail-text")
             if designer_text:
@@ -124,10 +124,10 @@ class Scrapper:
         svg_div = soup.find("div", class_="intro-featured-wrapper")
         if not svg_div:
             raise RuntimeError
-        if svg_div:
-            img_tag = svg_div.find("img", class_="content-img w-condition-invisible")
-            if img_tag and img_tag.get("src", "").endswith(".svg"):
-                svg_url = img_tag["src"]
+        if svg_div: 
+            img_tag = svg_div.find("img", class_="content-img w-condition-invisible") # type: ignore
+            if img_tag and img_tag.get("src", "").endswith(".svg"): # type: ignore
+                svg_url = img_tag["src"] # type: ignore
                 svg_path = f"{filename_base}.svg"
                 self.download_file(svg_url, svg_path)
                 
