@@ -20,6 +20,8 @@ class Scrapper:
     def __init__(self):
         self.base_url = "https://www.dimensions.com"
         self.collection_url = f"{self.base_url}/collection/phones-cell-phones"
+        self.out_folder = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "output")
+        self.svg_folder = os.path.join(self.out_folder, "SVGs")
         self.headers = {
             "User-Agent": "Mozilla/5.0"
         }
@@ -59,12 +61,11 @@ class Scrapper:
             if a_tag and a_tag.get('href'): # type: ignore
                 links[name] = urljoin(self.base_url, a_tag['href']) # type: ignore
         return links
-    
-    @staticmethod
-    def safe_filename(name):
-        return "".join(c if c.isalnum() or c in " _-" else "_" for c in name)
 
     def download_file(self, url, filepath):
+        if os.path.exists(filepath):
+            print("File already exists:", filepath)
+            return
         try:
             time.sleep(random.uniform(1.5, 3.0))
             os.makedirs(os.path.dirname(filepath), exist_ok=True)
@@ -116,21 +117,25 @@ class Scrapper:
             if designer_text:
                 result["Designer"] = designer_text.get_text(strip=True)
 
-        designer = result.get("Designer", "Unknown")
-        folder = os.path.join("output", self.safe_filename(designer))
-        filename_base = os.path.join(folder, self.safe_filename(name))
+        designer = result.get("Designer", "Unknown").strip()
+        folder = os.path.join(self.svg_folder, designer)
+        filename_base = os.path.join(folder, name)
 
         # 2. Download SVG
         svg_div = soup.find("div", class_="intro-featured-wrapper")
         if not svg_div:
             raise RuntimeError
         if svg_div: 
-            img_tag = svg_div.find("img", class_="content-img w-condition-invisible") # type: ignore
-            if img_tag and img_tag.get("src", "").endswith(".svg"): # type: ignore
-                svg_url = img_tag["src"] # type: ignore
+            img_tag_invisible = svg_div.find("img", class_="content-img w-condition-invisible") # type: ignore
+            if img_tag_invisible and img_tag_invisible.get("src", "").endswith(".svg"): # type: ignore
+                svg_url = img_tag_invisible["src"] # type: ignore
                 svg_path = f"{filename_base}.svg"
                 self.download_file(svg_url, svg_path)
-                
+            img_tag_visible = svg_div.find("img", class_="content-img") # type: ignore
+            if img_tag_visible and img_tag_visible.get("src", "").endswith(".svg"): # type: ignore
+                svg_url = img_tag_visible["src"] # type: ignore
+                svg_path = f"{filename_base}_visible.svg"
+                self.download_file(svg_url, svg_path)  
         return result
     
     def run(self):
@@ -138,14 +143,18 @@ class Scrapper:
         phone_links = self.get_all_phone_links()
         print("Total phone links found:", len(phone_links))
         for name, link in tqdm(phone_links.items(), desc="Scraping phones"):
-            data = self.scrape_phone_data(name, link)
+            safe_name = name.strip()
+            data = self.scrape_phone_data(safe_name, link)
             if data:
-                all_data[name] = data
+                all_data[safe_name] = data
 
         # Save all scraped data to a file
-        with open("phone_metadata.json", "w") as f:
-            json.dump(all_data, f, indent=2)
+        metadata_json = os.path.join(self.out_folder, "phone_metadata.json")
+        with open(metadata_json, "w") as f:
+            json.dump(all_data, f, indent=4)
+        return metadata_json
     
 
 if __name__ == "__main__":
-    Scrapper().run()
+    metadata_json = Scrapper().run() 
+    print("Metadata JSON:", metadata_json)
