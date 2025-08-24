@@ -6,6 +6,9 @@ import base64
 import redis
 import redis.exceptions
 import boto3
+import  numpy as np
+import cv2
+from PIL import Image
 from datetime import datetime
 from botocore.client import Config
 from uuid import uuid4
@@ -14,9 +17,6 @@ import cloudinary
 import cloudinary.uploader as cd_uploader
 from huggingface_hub import InferenceClient
 from fastapi import HTTPException, BackgroundTasks, status
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
-from app.models import PhoneModel
 import smtplib
 from email.message import EmailMessage
 from scripts.auth import AuthUtils
@@ -90,7 +90,7 @@ class Utils:
                                     )
 
 
-    async def generate_with_replicate(self, prompt: str, phone_height:float, phone_width:float, num_outputs:int):
+    async def generate_with_replicate(self, prompt: str, phone_height:float, phone_width:float, num_outputs:int) -> list:
         """_summary_
 
         Args:
@@ -117,7 +117,7 @@ class Utils:
         except Exception as err:
             print("Following error occurred while generating image: {err} \n" \
                   "input params: {input}")
-        return outputs
+        return outputs # type: ignore
     
 
     @staticmethod
@@ -164,7 +164,7 @@ class Utils:
         """
         file_uuid = str(file_uuid)
         self.s3.upload_fileobj(
-            Fileobj=io.BytesIO(img_bytes),
+            Fileobj=img_bytes,
             Bucket=os.getenv("AWS_S3_BUCKET"),
             Key=file_uuid,
             ExtraArgs={'ContentType': 'image/png'}
@@ -172,8 +172,9 @@ class Utils:
         signed_url = self.s3.generate_presigned_url(
             "get_object",
             Params={"Bucket": os.getenv("AWS_S3_BUCKET"), "Key": file_uuid},
+            ExpiresIn=86400
         )
-        self.r.set(file_uuid, signed_url)
+        return signed_url
 
     def hash_password(self, password: str):
         return self.pwd_context.hash(password)
@@ -197,36 +198,50 @@ class Utils:
         self.r.set(anon_id, (count + 1)) # type: ignore
     
     async def handle_generation(
-            self, prompt: str, phone_model_id:str, db: AsyncSession, bg_tasks: BackgroundTasks
+            self, prompt: str, phone_height:float, phone_width: float, s3_path:str, bg_tasks: BackgroundTasks
             ) -> dict:
         """_summary_
 
         Args:
             prompt (str): _description_
-            phone_model_id (str): _description_
-            db (AsyncSession): _description_
+            phone_height (float): _description_
+            phone_width (float): _description_
+            s3_path (str): _description_
             bg_tasks (BackgroundTasks): _description_
 
         Returns:
             dict: _description_
-        """
-        result = await db.execute(select(PhoneModel).where(PhoneModel.id == phone_model_id))
-        phone_mdl_parm = result.scalar_one()
-        
+        """      
         outputs = await self.generate_with_replicate(
             prompt,
-            phone_mdl_parm.phone_height,  # type: ignore
-            phone_mdl_parm.phone_width,   # type: ignore
-            1
+            phone_height, 
+            phone_width,  
+            3
         )
-
         return_data = {}
-        for img_file in outputs:  # type: ignore
+        for out in outputs:
+            img_bytes = await out.aread()
+            nparr = np.frombuffer(img_bytes, np.uint8)
+            image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+            mask = cv2.imread(s3_path)
+            image = cv2.resize(image, (mask.shape[1], mask.shape[0]), interpolation=cv2.INTER_LANCZOS4)
+            mask = mask / 255.0
+            masked_image = (image * mask).astype(np.uint8)
+            masked_img_bytes  = self.numpy_to_image_bytes(masked_image)
             img_uuid = uuid4()
-            return_data[str(img_uuid)] = img_file.url
-            bg_tasks.add_task(self.upload_to_s3, img_file.read(), str(img_uuid))
+            img_link = self.upload_to_s3(masked_img_bytes, str(img_uuid))
+            return_data[str(img_uuid)] = img_link
+
         return return_data
-    
+
+    @staticmethod
+    def numpy_to_image_bytes(np_array, format="PNG"):
+        image = Image.fromarray(np_array.astype(np.uint8))
+        img_bytes = io.BytesIO()
+        image.save(img_bytes, format=format)
+        img_bytes.seek(0)  
+        return img_bytes
+        
     @staticmethod
     def send_email(to_email: str, subject: str, body=None, html_content=None):
         """_summary_

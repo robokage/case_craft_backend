@@ -1,11 +1,13 @@
 from typing import Annotated
-from fastapi import APIRouter, Depends, BackgroundTasks, Request
+from fastapi import APIRouter, Depends, BackgroundTasks, Request, HTTPException
 from fastapi.responses import JSONResponse
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.db import SessionLocal
 from uuid import uuid4
 
 from app.schemas import PromptInput
+from app.models import PhoneModel
 from scripts.utils import Utils
 from scripts.auth import AuthUtils
 
@@ -31,8 +33,15 @@ async def generate_with_just_prompt_anon(
     if not anon_id:
             anon_id = str(uuid4())
     utils.validate_max_gen_anon(anon_id)
-    return_data = await utils.handle_generation(
-        payload.prompt, payload.phone_model_id, db, bg_tasks)
+    result = await db.execute(select(PhoneModel).where(PhoneModel.id == payload.phone_model_id))
+    phone_mdl_parm = result.scalar_one_or_none()
+    if not phone_mdl_parm:
+        raise HTTPException(status_code=404, detail="User with given email already exists")
+    return_data = await utils.handle_generation(prompt=payload.prompt,
+                                                phone_height=phone_mdl_parm.phone_height, #type: ignore
+                                                phone_width=phone_mdl_parm.phone_width, #type: ignore
+                                                s3_path=phone_mdl_parm.s3_path, #type: ignore
+                                                bg_tasks=bg_tasks)
     response = JSONResponse(content=return_data)
     response.set_cookie(key="anon_id", value=anon_id, max_age=60*60*24*30)
     return response
@@ -45,6 +54,13 @@ async def generate_with_just_prompt(
     db: db_dependency, 
     user_id: str = Depends(auth_utils.get_current_user_id)
     ):
-    return_data = await utils.handle_generation(
-         payload.prompt, payload.phone_model_id, db, bg_tasks)
+    result = await db.execute(select(PhoneModel).where(PhoneModel.id == payload.phone_model_id))
+    phone_mdl_parm = result.scalar_one_or_none()
+    if not phone_mdl_parm:
+        raise HTTPException(status_code=404, detail="User with given email already exists")
+    return_data = await utils.handle_generation(prompt=PromptInput.prompt,
+                                                phone_height=phone_mdl_parm.phone_height, #type: ignore
+                                                phone_width=phone_mdl_parm.phone_width, #type: ignore
+                                                s3_path=phone_mdl_parm.s3_path, #type: ignore
+                                                bg_tasks=bg_tasks)
     return return_data
