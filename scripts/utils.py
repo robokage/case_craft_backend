@@ -164,7 +164,7 @@ class Utils:
         """
         file_uuid = str(file_uuid)
         self.s3.upload_fileobj(
-            Fileobj=img_bytes,
+            Fileobj=io.BytesIO(img_bytes),
             Bucket=os.getenv("AWS_S3_BUCKET"),
             Key=file_uuid,
             ExtraArgs={'ContentType': 'image/png'}
@@ -216,7 +216,7 @@ class Utils:
             prompt,
             phone_height, 
             phone_width,  
-            3
+            1
         )
         return_data = {}
         for out in outputs:
@@ -227,20 +227,16 @@ class Utils:
             image = cv2.resize(image, (mask.shape[1], mask.shape[0]), interpolation=cv2.INTER_LANCZOS4)
             mask = mask / 255.0
             masked_image = (image * mask).astype(np.uint8)
-            masked_img_bytes  = self.numpy_to_image_bytes(masked_image)
+            success, masked_img_bytes = cv2.imencode(".png", masked_image)
+            if not success:
+                raise HTTPException(status_code=500, detail="Error while image processing. Kindly try again")
             img_uuid = uuid4()
-            img_link = self.upload_to_s3(masked_img_bytes, str(img_uuid))
+            img_link = self.upload_to_s3(masked_img_bytes.tobytes(), str(img_uuid))
             return_data[str(img_uuid)] = img_link
+            self.r.set(str(img_uuid), "pending")
+            bg_tasks.add_task(self.upscale_image, out.url, img_uuid)
 
         return return_data
-
-    @staticmethod
-    def numpy_to_image_bytes(np_array, format="PNG"):
-        image = Image.fromarray(np_array.astype(np.uint8))
-        img_bytes = io.BytesIO()
-        image.save(img_bytes, format=format)
-        img_bytes.seek(0)  
-        return img_bytes
         
     @staticmethod
     def send_email(to_email: str, subject: str, body=None, html_content=None):
@@ -286,4 +282,28 @@ class Utils:
             html = file.read()
         html_content = html.replace("{reset_link}", reset_link).replace("{year}", str(datetime.now().year))
         self.send_email(to_email=to_email, subject=subject, html_content=html_content)
+    
+    def upscale_image(self, image_url, file_uuid, scale=2):
+        """_summary_
+
+        Args:
+            image_url (_type_): _description_
+            file_uuid (_type_): _description_
+            scale (int, optional): _description_. Defaults to 2.
+        """
+        input={
+            "image": image_url,
+            "scale": scale,
+            "face_enhance": False
+        }
+        output = replicate.run(
+            ref="nightmareai/real-esrgan:f121d640bd286e1fdc67f9799164c1d5be36ff74576ee11c803ae5b665dd46aa",
+            input=input
+        )
+        signed_url = self.upload_to_s3(img_bytes=output.read(), file_uuid=f"{str(file_uuid)}_upscaled") #type: ignore
+        self.r.set(str(file_uuid), signed_url, ex=86400)
+
+    def get_image_download_link(self, img_uuid: str) -> str:
+        return str(self.r.get(str(img_uuid)))
+
    

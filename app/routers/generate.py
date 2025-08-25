@@ -58,9 +58,17 @@ async def generate_with_just_prompt(
     phone_mdl_parm = result.scalar_one_or_none()
     if not phone_mdl_parm:
         raise HTTPException(status_code=404, detail="User with given email already exists")
-    return_data = await utils.handle_generation(prompt=PromptInput.prompt,
+    return_data = await utils.handle_generation(prompt=payload.prompt,
                                                 phone_height=phone_mdl_parm.phone_height, #type: ignore
                                                 phone_width=phone_mdl_parm.phone_width, #type: ignore
                                                 s3_path=phone_mdl_parm.s3_path, #type: ignore
                                                 bg_tasks=bg_tasks)
     return return_data
+
+
+@router.get("/get-download-link")
+async def get_download_link(img_uuid: str):
+    download_link = utils.get_image_download_link(img_uuid)
+    if not download_link or download_link == "None":
+        raise HTTPException(404, detail="Could not find the specified image. It may have been expired")
+    return download_link
