@@ -171,7 +171,10 @@ class Utils:
             )
         signed_url = self.s3.generate_presigned_url(
             "get_object",
-            Params={"Bucket": os.getenv("AWS_S3_BUCKET"), "Key": file_uuid},
+            Params={"Bucket": os.getenv("AWS_S3_BUCKET"), 
+                    "ResponseContentDisposition": f"attachment; filename={file_uuid}.png",
+                    "Key": file_uuid,
+                    "ResponseContentType": "image/png"},
             ExpiresIn=86400
         )
         return signed_url

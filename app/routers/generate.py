@@ -66,7 +66,7 @@ async def generate_with_just_prompt(
     return return_data
 
 
-@router.get("/get-download-link")
+@router.get("/get-download-link/{img_uuid}")
 async def get_download_link(img_uuid: str):
     download_link = utils.get_image_download_link(img_uuid)
     if not download_link or download_link == "None":
