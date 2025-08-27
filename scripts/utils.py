@@ -224,12 +224,15 @@ class Utils:
         return_data = {}
         for out in outputs:
             img_bytes = await out.aread()
-            nparr = np.frombuffer(img_bytes, np.uint8)
-            image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-            mask = cv2.imread(s3_path)
+            np_arr = np.frombuffer(img_bytes, np.uint8)
+            image = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
+            mask = cv2.imread(s3_path,  cv2.IMREAD_UNCHANGED)
             image = cv2.resize(image, (mask.shape[1], mask.shape[0]), interpolation=cv2.INTER_LANCZOS4)
-            mask = mask / 255.0
-            masked_image = (image * mask).astype(np.uint8)
+            mask_rgb = mask[:, :, :3]
+            alpha = mask[:, :, 3]
+            mask_rgb = mask_rgb / 255.0
+            masked_image = (image * mask_rgb).astype(np.uint8)
+            masked_image = cv2.merge([masked_image, alpha])
             success, masked_img_bytes = cv2.imencode(".png", masked_image)
             if not success:
                 raise HTTPException(status_code=500, detail="Error while image processing. Kindly try again")
