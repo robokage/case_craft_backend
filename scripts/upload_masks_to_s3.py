@@ -1,0 +1,66 @@
+import os
+from PIL import Image
+import io
+import boto3
+from botocore.client import Config
+from dotenv import load_dotenv
+from numpy import imag
+from sqlalchemy.future import select
+from sqlalchemy import create_engine
+from sqlalchemy.orm import Session, sessionmaker
+from torch import pinverse
+load_dotenv() 
+
+
+from app.models import PhoneBrand, PhoneModel
+
+class MaskUploader:
+
+    def __init__(self) -> None:
+        self.s3 = boto3.client(
+            "s3",
+            region_name=os.getenv("AWS_REGION"),  
+            config=Config(signature_version="s3v4")
+        )
+        DATABASE_URL = os.getenv("SYNC_DATABASE_URL")
+        assert DATABASE_URL is not None, "Database url missing"
+        engine = create_engine(DATABASE_URL)
+        self.session = sessionmaker(bind=engine, class_=Session, expire_on_commit=False)
+
+    def get_all_phone_models(self):
+        with self.session() as session:
+            query_result  = session.execute(
+                select(PhoneModel.name, PhoneBrand.name).join(PhoneBrand, PhoneModel.brand_id == PhoneBrand.id)
+            )
+            phone_models = query_result.all()
+        
+        return phone_models
+    
+    def upload_to_s3(self):
+        mask_folder = os.getenv("MASK_FOLDER")
+        phone_models = self.get_all_phone_models()
+        for model in phone_models:
+            model_name = model[0]
+            brand_name = model[1]
+            mask_path = os.path.join(mask_folder, brand_name, f"{model_name}.png") #type: ignore
+            if os.path.exists(mask_path):
+                print(f"Uploading {model_name} Mask") 
+                image = Image.open(mask_path)
+                buffer = io.BytesIO()
+                image.save(buffer, format="PNG")
+                buffer.seek(0)
+                self.s3.upload_fileobj(
+                Fileobj=buffer,
+                Bucket=os.getenv("AWS_S3_BUCKET"),
+                Key=f"Masks/{brand_name}/{model_name}",
+                ExtraArgs={'ContentType': 'image/png'}
+                )
+            else:
+                print(f"Skipping {model_name}")
+            
+
+MaskUploader().upload_to_s3()
+
+
+
+
