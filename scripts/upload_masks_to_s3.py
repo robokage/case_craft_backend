@@ -6,7 +6,7 @@ from botocore.client import Config
 from dotenv import load_dotenv
 from numpy import imag
 from sqlalchemy.future import select
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, update
 from sqlalchemy.orm import Session, sessionmaker
 load_dotenv() 
 
@@ -42,6 +42,7 @@ class MaskUploader:
     def upload_to_s3(self):
         mask_folder = os.getenv("MASK_FOLDER")
         phone_models = self.get_all_phone_models()
+        mask_uploaded = []
         for model in phone_models:
             model_name = model[0]
             model_id = str(model[1])
@@ -60,9 +61,17 @@ class MaskUploader:
                 Key=f"Masks/{brand_id}/{model_id}",
                 ExtraArgs={'ContentType': 'image/png'}
                 )
+                mask_uploaded.append(model_id)
             else:
                 print(f"Skipping {model_name}")
-            
+        self.update_db(mask_uploaded)
+    
+    def update_db(self, mask_uploaded):
+        with self.session() as session:
+            session.execute(
+                update(PhoneModel).where(PhoneModel.id.in_(mask_uploaded)).values(mask_available = True)
+            )
+            session.commit()
 
 MaskUploader().upload_to_s3()
 
