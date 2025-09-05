@@ -1,4 +1,4 @@
-from sqlalchemy import Boolean, Column, Integer, String, ForeignKey, DateTime, Numeric, UUID
+from sqlalchemy import Boolean, Column, Integer, String, ForeignKey, DateTime, Numeric, UUID, Boolean, text
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from sqlalchemy import Enum
@@ -27,7 +27,7 @@ class PhoneModel(Base):
     phone_width = Column(Numeric(5, 2))  
     phone_height = Column(Numeric(5, 2)) 
 
-    s3_path = Column(String)
+    mask_available = Column(Boolean, server_default=text("false"), nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now(), server_default=func.now())
 
