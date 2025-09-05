@@ -8,7 +8,6 @@ from numpy import imag
 from sqlalchemy.future import select
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
-from torch import pinverse
 load_dotenv() 
 
 
