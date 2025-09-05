@@ -30,7 +30,11 @@ class MaskUploader:
     def get_all_phone_models(self):
         with self.session() as session:
             query_result  = session.execute(
-                select(PhoneModel.name, PhoneBrand.name).join(PhoneBrand, PhoneModel.brand_id == PhoneBrand.id)
+                select(PhoneModel.name, 
+                       PhoneModel.id, 
+                       PhoneBrand.name, 
+                       PhoneBrand.id
+                       ).join(PhoneBrand, PhoneModel.brand_id == PhoneBrand.id)
             )
             phone_models = query_result.all()
         
@@ -41,7 +45,9 @@ class MaskUploader:
         phone_models = self.get_all_phone_models()
         for model in phone_models:
             model_name = model[0]
-            brand_name = model[1]
+            model_id = str(model[1])
+            brand_name = model[2]
+            brand_id = str(model[3])
             mask_path = os.path.join(mask_folder, brand_name, f"{model_name}.png") #type: ignore
             if os.path.exists(mask_path):
                 print(f"Uploading {model_name} Mask") 
@@ -52,7 +58,7 @@ class MaskUploader:
                 self.s3.upload_fileobj(
                 Fileobj=buffer,
                 Bucket=os.getenv("AWS_S3_BUCKET"),
-                Key=f"Masks/{brand_name}/{model_name}",
+                Key=f"Masks/{brand_id}/{model_id}",
                 ExtraArgs={'ContentType': 'image/png'}
                 )
             else:

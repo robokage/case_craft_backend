@@ -11,7 +11,7 @@ import cv2
 from PIL import Image
 from datetime import datetime
 from botocore.client import Config
-from uuid import uuid4
+from uuid import UUID, uuid4
 from passlib.context import CryptContext
 import cloudinary
 import cloudinary.uploader as cd_uploader
@@ -19,7 +19,6 @@ from huggingface_hub import InferenceClient
 from fastapi import HTTPException, BackgroundTasks, status
 import smtplib
 from email.message import EmailMessage
-from scripts.auth import AuthUtils
 
 
 class Utils:
@@ -115,8 +114,8 @@ class Utils:
             outputs =  await replicate.async_run("black-forest-labs/flux-schnell", 
                                             input=input)
         except Exception as err:
-            print("Following error occurred while generating image: {err} \n" \
-                  "input params: {input}")
+            print(f"Following error occurred while generating image: {err} \n" \
+                  f"input params: {input}")
         return outputs # type: ignore
     
 
@@ -201,7 +200,7 @@ class Utils:
         self.r.set(anon_id, (count + 1)) # type: ignore
     
     async def handle_generation(
-            self, prompt: str, phone_height:float, phone_width: float, s3_path:str, bg_tasks: BackgroundTasks
+            self, prompt: str, phone_height:float, phone_width: float, model_id:UUID, brand_id:UUID, bg_tasks: BackgroundTasks
             ) -> dict:
         """_summary_
 
@@ -226,7 +225,7 @@ class Utils:
             img_bytes = await out.aread()
             np_arr = np.frombuffer(img_bytes, np.uint8)
             image = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
-            mask = cv2.imread(s3_path,  cv2.IMREAD_UNCHANGED)
+            mask = self.get_mask_from_s3(model_id, brand_id)
             image = cv2.resize(image, (mask.shape[1], mask.shape[0]), interpolation=cv2.INTER_LANCZOS4)
             mask_rgb = mask[:, :, :3]
             alpha = mask[:, :, 3]
@@ -312,4 +311,19 @@ class Utils:
     def get_image_download_link(self, img_uuid: str) -> str:
         return str(self.r.get(str(img_uuid)))
 
-   
+    def get_mask_from_s3(self, model_id:UUID, brand_id:UUID):
+        """_summary_
+
+        Args:
+            model_id (UUID): _description_
+            brand_id (UUID): _description_
+
+        Returns:
+            _type_: _description_
+        """
+        response = self.s3.get_object(Bucket=os.getenv("AWS_S3_BUCKET"), 
+                                 Key=f"Masks/{brand_id}/{model_id}")
+        img_bytes = response.get("Body").read()
+        np_arr = np.frombuffer(img_bytes, np.uint8)
+        img = cv2.imdecode(np_arr, cv2.IMREAD_UNCHANGED)
+        return img

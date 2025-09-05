@@ -40,7 +40,8 @@ async def generate_with_just_prompt_anon(
     return_data = await utils.handle_generation(prompt=payload.prompt,
                                                 phone_height=phone_mdl_parm.phone_height, #type: ignore
                                                 phone_width=phone_mdl_parm.phone_width, #type: ignore
-                                                s3_path=phone_mdl_parm.s3_path, #type: ignore
+                                                model_id=phone_mdl_parm.id, #type: ignore
+                                                brand_id=phone_mdl_parm.brand_id, #type: ignore
                                                 bg_tasks=bg_tasks)
     response = JSONResponse(content=return_data)
     response.set_cookie(key="anon_id", value=anon_id, max_age=60*60*24*30)
@@ -61,7 +62,8 @@ async def generate_with_just_prompt(
     return_data = await utils.handle_generation(prompt=payload.prompt,
                                                 phone_height=phone_mdl_parm.phone_height, #type: ignore
                                                 phone_width=phone_mdl_parm.phone_width, #type: ignore
-                                                s3_path=phone_mdl_parm.s3_path, #type: ignore
+                                                model_id=phone_mdl_parm.id, #type: ignore
+                                                brand_id=phone_mdl_parm.brand_id, #type: ignore
                                                 bg_tasks=bg_tasks)
     return return_data
 
