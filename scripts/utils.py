@@ -44,7 +44,9 @@ class Utils:
         self.project_dir = os.path.dirname(os.path.dirname(current_file))
         self.max_gen_for_anon = 1
         try:
-            self.r = redis.Redis(host='localhost', port=6379, decode_responses=True)
+            self.r = redis.Redis(host=os.getenv("REDIS_SERVER", "localhost"), 
+                                 port=int(os.getenv("REDIS_PORT", 0)), 
+                                 decode_responses=True)
             self.r.ping()
             print("✅ Redis server is running.")
         except redis.exceptions.ConnectionError:
