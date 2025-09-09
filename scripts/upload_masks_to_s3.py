@@ -21,7 +21,7 @@ class MaskUploader:
             region_name=os.getenv("AWS_REGION"),  
             config=Config(signature_version="s3v4")
         )
-        DATABASE_URL = os.getenv("SYNC_DATABASE_URL")
+        DATABASE_URL = os.getenv("EC2_SYNC_DATABASE_URL")
         assert DATABASE_URL is not None, "Database url missing"
         engine = create_engine(DATABASE_URL)
         self.session = sessionmaker(bind=engine, class_=Session, expire_on_commit=False)
