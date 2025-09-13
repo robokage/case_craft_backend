@@ -13,7 +13,7 @@ app.include_router(gen_router, prefix="/generate")
 app.include_router(user_router, prefix="/user")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://www.casecraft.space"],
+    allow_origins=["https://www.casecraft.space", "http://localhost:3000"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
