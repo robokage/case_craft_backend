@@ -1,5 +1,7 @@
 import os
+import sys
 import redis
+import redis.exceptions
 from datetime import datetime, timedelta
 from jose import JWTError, jwt
 from fastapi import Depends, HTTPException, status
@@ -37,7 +39,16 @@ class AuthUtils:
             client_kwargs={"scope": os.getenv("GOOGLE_API_SCOPE")},
             server_metadata_url=os.getenv("GOOGLE_SERVER_METADATA_URL")
         )
-        self.r = redis.Redis(host='localhost', port=6379, decode_responses=True)
+        try:
+            self.r = redis.Redis(host=os.getenv("REDIS_SERVER", "localhost"), 
+                                 port=int(os.getenv("REDIS_PORT", 0)), 
+                                 decode_responses=True)
+            self.r.ping()
+            print("✅ Redis server is running.")
+        except redis.exceptions.ConnectionError:
+            print("❌ Redis server is NOT running.")
+            sys.exit(1)
+            
 
     def create_access_token(self, data: dict, exp_min: int = 0):
         """_summary_
