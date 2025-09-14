@@ -168,7 +168,7 @@ standard authentication and Google OAuth.
 
 
 
-## 📈 Roadmap / To Do
+## 📈 Roadmap
 
 - [ ] **CI/CD**: Add CI/CD pipeline for automated deployments
 - [ ] **Phone Models**: Create mask and add support for more phone models
