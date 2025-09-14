@@ -1,4 +1,4 @@
-# CaseCraft Backend
+# CaseCraft
 
 This is the backend service for CaseCraft, an app used to generate custom phone skins and wallpapers using generative AI.\
 The project powers [CaseCraft.space](https://www.casecraft.space/) and
