@@ -67,7 +67,7 @@ async def google_login(request : Request):
 async def google_callback(request: Request, db: db_dependency):
     token = await auth_utils.google_oauth.google.authorize_access_token(request) #type: ignore
     user_info = token.get("userinfo")
-    if not user_info:
+    if not user_info or "accounts.google.com" not in user_info.get("iss"):
         raise HTTPException(status_code=400, detail="Failed to fetch user info")
     result = await db.execute(select(UserModel).where(UserModel.email == user_info.get("email")))
     new_user = result.scalar_one_or_none()
